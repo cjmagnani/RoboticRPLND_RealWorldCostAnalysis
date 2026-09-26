@@ -4,8 +4,8 @@ This repository contains the key processing scripts for our real-world cost anal
 
 We include the cost estimation framework and implementation of a custom grouper for the Medicare Severity Diagnosis-Related Group (MS-DRG) and
 cost assignments using publicly available government resources obtained from the Centers for Medicare & Medicaid Services (CMS) reimbursement
-schedules for the Inpatient Prospective Payment System (IPPS) and Physician Fee Schedule (PFS). We additionally provide key downloaded files
-in the repository structured for reference files to be called by the included R scripts.
+schedules for the Inpatient Prospective Payment System (IPPS) and Physician Fee Schedule (PFS). Descriptions are given for how to organize
+the reference files to be called by the included R scripts.
 
 ## Project Structure
 
@@ -22,5 +22,5 @@ You will need the CMS files as described in both script comments as well as the 
 
 ### Execution
 1. Clone this repository or download the ZIP file.
-2. Ensure your raw CMS data files are structured within the `Data_raw/` directory.
+2. Ensure your raw CMS data files are structured within a `Data_raw/` directory as described in the script comments.
 3. Open and execute `00_main.R` to run the full end-to-end analysis, follow commentary regarding any remaining installs and adapt as needed.
