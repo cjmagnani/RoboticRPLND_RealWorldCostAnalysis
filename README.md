@@ -4,9 +4,7 @@ This repository contains the key processing scripts for our real-world cost anal
 
 ### We encourage you to adapt this code for your own project; however, when doing so please cite our paper:
 
-#   Magnani CJ, Ramos F, Qian Z, et al. Robotic-Assisted vs. Open Retroperitoneal Lymph Node
-#     Dissection for Testicular Cancer: Real-World Evidence of Lower Costs and Health System
-#     Utilization. [Journal details to be updated upon peer-reviewed publication].
+####   Magnani CJ, Ramos F, Qian Z, et al. Robotic-Assisted vs. Open Retroperitoneal Lymph Node Dissection for Testicular Cancer: Real-World Evidence of Lower Costs and Health System Utilization. [Journal details to be updated upon peer-reviewed publication].
 
 We include the cost estimation framework and implementation of a custom grouper for the Medicare Severity Diagnosis-Related Group (MS-DRG) and
 cost assignments using publicly available government resources obtained from the Centers for Medicare & Medicaid Services (CMS) reimbursement
