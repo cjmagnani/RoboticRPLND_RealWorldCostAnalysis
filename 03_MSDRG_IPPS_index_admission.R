@@ -31,65 +31,65 @@
 
 df.principal_dx <- df.ICD10PCS_codes %>%
     filter(original_ICD_10_PCS_rank == 1) %>%
-    mutate(days_from_surgery = abs(as.numeric(difftime(Date_Code, Date_RPLND, units = "days")))) %>%
-    group_by(PMRN, Last_Name, DOB, Date_RPLND) %>%
+    mutate(days_from_surgery = abs(as.numeric(difftime(Date_Code, Date_Surgery, units = "days")))) %>%
+    group_by(PMRN, Last_Name, DOB, Date_Surgery) %>%
     slice_min(days_from_surgery, n = 1, with_ties = FALSE) %>%
     ungroup() %>%
-    select(PMRN, Last_Name, DOB, Date_RPLND,
+    select(PMRN, Last_Name, DOB, Date_Surgery,
            Principal_Dx = ICD_CM_Code,
            Principal_Dx_Date = Date_Code)
 
-df.LOS_lookup <- df.clinical %>% distinct(PMRN, Last_Name, DOB, Date_RPLND, LOS)
+df.LOS_lookup <- df.clinical %>% distinct(PMRN, Last_Name, DOB, Date_Surgery, LOS)
 
 df.admission_codes <- df.raw_codes %>%
-    select(PMRN, Last_Name, DOB, Date_RPLND, Date_Code, ICD_CM_Code) %>%
+    select(PMRN, Last_Name, DOB, Date_Surgery, Date_Code, ICD_CM_Code) %>%
     distinct() %>%
-    left_join(df.LOS_lookup, by = c("PMRN", "Last_Name", "DOB", "Date_RPLND")) %>%
-    mutate(days_from_surgery = as.numeric(difftime(Date_Code, Date_RPLND, units = "days"))) %>%
+    left_join(df.LOS_lookup, by = c("PMRN", "Last_Name", "DOB", "Date_Surgery")) %>%
+    mutate(days_from_surgery = as.numeric(difftime(Date_Code, Date_Surgery, units = "days"))) %>%
     filter(days_from_surgery >= 0, days_from_surgery <= LOS)
 
 df.admission_codes_pcs <- df.ICD10PCS_codes %>%
-    select(PMRN, Last_Name, DOB, Date_RPLND, Date_Code, original_ICD_10_PCS_rank, ICD_10_PCS) %>%
+    select(PMRN, Last_Name, DOB, Date_Surgery, Date_Code, original_ICD_10_PCS_rank, ICD_10_PCS) %>%
     distinct() %>%
-    left_join(df.LOS_lookup, by = c("PMRN", "Last_Name", "DOB", "Date_RPLND")) %>%
-    mutate(days_from_surgery = as.numeric(difftime(Date_Code, Date_RPLND, units = "days"))) %>%
+    left_join(df.LOS_lookup, by = c("PMRN", "Last_Name", "DOB", "Date_Surgery")) %>%
+    mutate(days_from_surgery = as.numeric(difftime(Date_Code, Date_Surgery, units = "days"))) %>%
     filter(days_from_surgery >= 0, days_from_surgery <= LOS)
 
 df.secondary_dx <- df.admission_codes %>%
-    left_join(df.principal_dx %>% select(PMRN, Date_RPLND, Principal_Dx),
-              by = c("PMRN", "Date_RPLND")) %>%
+    left_join(df.principal_dx %>% select(PMRN, Date_Surgery, Principal_Dx),
+              by = c("PMRN", "Date_Surgery")) %>%
     filter(ICD_CM_Code != Principal_Dx) %>%
-    distinct(PMRN, Last_Name, DOB, Date_RPLND, ICD_CM_Code) %>%
-    group_by(PMRN, Last_Name, DOB, Date_RPLND) %>%
+    distinct(PMRN, Last_Name, DOB, Date_Surgery, ICD_CM_Code) %>%
+    group_by(PMRN, Last_Name, DOB, Date_Surgery) %>%
     summarize(Secondary_Dx = list(ICD_CM_Code), n_secondary_dx = n(), .groups = "drop") %>%
-    right_join(df.principal_dx %>% select(PMRN, Last_Name, DOB, Date_RPLND),
-               by = c("PMRN", "Last_Name", "DOB", "Date_RPLND")) %>%
+    right_join(df.principal_dx %>% select(PMRN, Last_Name, DOB, Date_Surgery),
+               by = c("PMRN", "Last_Name", "DOB", "Date_Surgery")) %>%
     mutate(n_secondary_dx = coalesce(n_secondary_dx, 0L),
            Secondary_Dx    = ifelse(n_secondary_dx == 0, list(character(0)), Secondary_Dx))
 
 # principal procedure: lowest-ranked PCS code on the same date as the principal diagnosis; ties
 # broken by clinical judgment where needed (edit tie_rank.temp for your own priority codes, if any)
 df.principal_proc <- df.ICD10PCS_codes %>%
-    group_by(PMRN, Last_Name, DOB, Date_RPLND) %>%
+    group_by(PMRN, Last_Name, DOB, Date_Surgery) %>%
     filter(original_ICD_10_PCS_rank == min(original_ICD_10_PCS_rank)) %>%
     ungroup() %>%
-    semi_join(df.principal_dx, by = c("PMRN", "Date_RPLND", "Date_Code" = "Principal_Dx_Date")) %>%
-    distinct(PMRN, Last_Name, DOB, Date_RPLND, ICD_10_PCS) %>%
+    semi_join(df.principal_dx, by = c("PMRN", "Date_Surgery", "Date_Code" = "Principal_Dx_Date")) %>%
+    distinct(PMRN, Last_Name, DOB, Date_Surgery, ICD_10_PCS) %>%
     arrange(PMRN, ICD_10_PCS) %>%
-    group_by(PMRN, Last_Name, DOB, Date_RPLND) %>%
+    group_by(PMRN, Last_Name, DOB, Date_Surgery) %>%
     slice(1) %>%
     ungroup() %>%
     rename(Principal_Proc = ICD_10_PCS)
 
 df.secondary_proc <- df.admission_codes_pcs %>%
-    left_join(df.principal_proc %>% select(PMRN, Date_RPLND, Principal_Proc),
-              by = c("PMRN", "Date_RPLND")) %>%
+    left_join(df.principal_proc %>% select(PMRN, Date_Surgery, Principal_Proc),
+              by = c("PMRN", "Date_Surgery")) %>%
     filter(ICD_10_PCS != Principal_Proc) %>%
-    distinct(PMRN, Last_Name, DOB, Date_RPLND, ICD_10_PCS) %>%
-    group_by(PMRN, Last_Name, DOB, Date_RPLND) %>%
+    distinct(PMRN, Last_Name, DOB, Date_Surgery, ICD_10_PCS) %>%
+    group_by(PMRN, Last_Name, DOB, Date_Surgery) %>%
     summarize(Secondary_Proc = list(ICD_10_PCS), n_secondary_proc = n(), .groups = "drop") %>%
-    right_join(df.principal_proc %>% select(PMRN, Last_Name, DOB, Date_RPLND),
-               by = c("PMRN", "Last_Name", "DOB", "Date_RPLND")) %>%
+    right_join(df.principal_proc %>% select(PMRN, Last_Name, DOB, Date_Surgery),
+               by = c("PMRN", "Last_Name", "DOB", "Date_Surgery")) %>%
     mutate(n_secondary_proc = coalesce(n_secondary_proc, 0L),
            Secondary_Proc   = ifelse(n_secondary_proc == 0, list(character(0)), Secondary_Proc))
 
@@ -98,27 +98,27 @@ df.secondary_proc <- df.admission_codes_pcs %>%
 # ------------------------------------------------------------------------------------------------ #
 
 df.grouper_input <- df.principal_dx %>%
-    distinct(PMRN, Last_Name, DOB, Date_RPLND) %>%
+    distinct(PMRN, Last_Name, DOB, Date_Surgery) %>%
     # EDIT: code per your cohort if the following assumptions do not apply!
     mutate(Sex = 1L, Discharge_Status = 1L, Admission_Type = 3L) %>%
     left_join(df.clinical %>%
-                  select(Last_Name, DOB, Date_RPLND, Age),
-              by = c("Last_Name", "DOB", "Date_RPLND")) %>%
+                  select(Last_Name, DOB, Date_Surgery, Age),
+              by = c("Last_Name", "DOB", "Date_Surgery")) %>%
     left_join(df.principal_dx %>%
-                  select(PMRN, Last_Name, DOB, Date_RPLND, Principal_Dx),
-              by = c("PMRN", "Last_Name", "DOB", "Date_RPLND")) %>%
+                  select(PMRN, Last_Name, DOB, Date_Surgery, Principal_Dx),
+              by = c("PMRN", "Last_Name", "DOB", "Date_Surgery")) %>%
     left_join(df.secondary_dx %>%
-                  select(PMRN, Last_Name, DOB, Date_RPLND, Secondary_Dx, n_secondary_dx),
-              by = c("PMRN", "Last_Name", "DOB", "Date_RPLND")) %>%
+                  select(PMRN, Last_Name, DOB, Date_Surgery, Secondary_Dx, n_secondary_dx),
+              by = c("PMRN", "Last_Name", "DOB", "Date_Surgery")) %>%
     left_join(df.principal_proc %>%
-                  select(PMRN, Last_Name, DOB, Date_RPLND, Principal_Proc),
-              by = c("PMRN", "Last_Name", "DOB", "Date_RPLND")) %>%
+                  select(PMRN, Last_Name, DOB, Date_Surgery, Principal_Proc),
+              by = c("PMRN", "Last_Name", "DOB", "Date_Surgery")) %>%
     left_join(df.secondary_proc %>%
-                  select(PMRN, Last_Name, DOB, Date_RPLND, Secondary_Proc, n_secondary_proc),
-              by = c("PMRN", "Last_Name", "DOB", "Date_RPLND")) %>%
+                  select(PMRN, Last_Name, DOB, Date_Surgery, Secondary_Proc, n_secondary_proc),
+              by = c("PMRN", "Last_Name", "DOB", "Date_Surgery")) %>%
     left_join(df.LOS_lookup,
-              by = c("PMRN", "Last_Name", "DOB", "Date_RPLND")) %>%
-    mutate(Discharge_Date = as.Date(Date_RPLND) + LOS)
+              by = c("PMRN", "Last_Name", "DOB", "Date_Surgery")) %>%
+    mutate(Discharge_Date = as.Date(Date_Surgery) + LOS)
 
 # Federal Fiscal Year (FFY = Oct 1 - Sep 30, named for the calendar year it ends in). ICD-10 MS-DRGs
 # began with V33 = FFY2016 and increment by 1 each FFY. Extend/edit for your own study period.
@@ -175,7 +175,7 @@ build_msgmce_input_record <- function(row) {
     secondary_dx <- row$Secondary_Dx[[1]]; secondary_pr <- row$Secondary_Proc[[1]]
     paste0(
         pad_left(substr(row$Last_Name, 1, 31), 31), pad_left("", 13), pad_left("", 17),
-        format(row$Date_RPLND, "%m/%d/%Y"), format(row$Discharge_Date, "%m/%d/%Y"),
+        format(row$Date_Surgery, "%m/%d/%Y"), format(row$Discharge_Date, "%m/%d/%Y"),
         "01", "00", pad_right(as.character(row$LOS), 5), format(row$DOB, "%m/%d/%Y"),
         pad_right(as.character(row$Age), 3), "1", pad_left("", 7),
         dx_field(row$Principal_Dx, "Y"),
@@ -520,7 +520,7 @@ GAF_EXPONENT <- 0.6822 # capital geographic adjustment factor exponent (GAF = wa
 
 df.facility_cost_index <- df.msdrg_index %>%
     filter(Grouped_OK) %>%
-    select(PMRN, Last_Name, DOB, Date_RPLND, FFY, MS_DRG) %>%
+    select(PMRN, Last_Name, DOB, Date_Surgery, FFY, MS_DRG) %>%
     left_join(df.drg_weights, by = c("FFY", "MS_DRG")) %>%
     left_join(df.wage_index,  by = "FFY") %>%
     left_join(df.ipps_rates,  by = "FFY") %>%
@@ -528,7 +528,7 @@ df.facility_cost_index <- df.msdrg_index %>%
            Operating_Payment = (Labor_Amount * Wage_Index + Nonlabor_Amount) * DRG_Weight,
            Capital_Payment   = Capital_Federal_Rate * GAF * DRG_Weight,
            Facility_Payment_Nominal = Operating_Payment + Capital_Payment,
-           Year_Code = year(Date_RPLND)) %>%
+           Year_Code = year(Date_Surgery)) %>%
     left_join(df.BEA_adj2025 %>% select(Year_Code, GDP_2025_multiplier), by = "Year_Code") %>%
     mutate(Facility_Payment_2025 = Facility_Payment_Nominal * GDP_2025_multiplier)
 

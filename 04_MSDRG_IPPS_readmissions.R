@@ -23,23 +23,23 @@ rnb_floor_codes <- c("EDIT_ME")  # provide list of codes for Room & Board on reg
 rnb_icu_codes   <- c("EDIT_ME")  # provide list of codes for Room & Board on ICU units
 
 df.all_stays <- df.raw_codes %>%
-    select(PMRN, Last_Name, DOB, Date_RPLND, Date_Code, CPT_Code) %>%
+    select(PMRN, Last_Name, DOB, Date_Surgery, Date_Code, CPT_Code) %>%
     distinct() %>%
     filter(CPT_Code %in% c(rnb_floor_codes, rnb_icu_codes)) %>%
-    mutate(day_offset = as.numeric(difftime(Date_Code, Date_RPLND, units = "days"))) %>%
+    mutate(day_offset = as.numeric(difftime(Date_Code, Date_Surgery, units = "days"))) %>%
     filter(day_offset >= 0) %>%
-    distinct(PMRN, Last_Name, DOB, Date_RPLND, Date_Code, day_offset) %>%
+    distinct(PMRN, Last_Name, DOB, Date_Surgery, Date_Code, day_offset) %>%
     arrange(PMRN, day_offset) %>%
-    group_by(PMRN, Last_Name, DOB, Date_RPLND) %>%
+    group_by(PMRN, Last_Name, DOB, Date_Surgery) %>%
     mutate(gap     = coalesce(day_offset - lag(day_offset) != 1, day_offset != 0),
            stay_id = cumsum(gap)) %>%
     ungroup()
 
 df.readmit_stays <- df.all_stays %>%
-    group_by(PMRN, Last_Name, DOB, Date_RPLND) %>%
+    group_by(PMRN, Last_Name, DOB, Date_Surgery) %>%
     mutate(index_stay = if (any(day_offset == 0)) stay_id[which(day_offset == 0)][1] else min(stay_id)) %>%
     filter(stay_id != index_stay) %>%
-    group_by(PMRN, Last_Name, DOB, Date_RPLND, stay_id) %>%
+    group_by(PMRN, Last_Name, DOB, Date_Surgery, stay_id) %>%
     summarize(Readmit_Admit_Date     = as.Date(min(Date_Code)),
               Readmit_Discharge_Date = as.Date(max(Date_Code)),
               Readmit_LOS            = n_distinct(day_offset),
@@ -47,7 +47,7 @@ df.readmit_stays <- df.all_stays %>%
               Readmit_Discharge_Day  = max(day_offset),
               .groups = "drop") %>%
     arrange(PMRN, Readmit_Admit_Day) %>%
-    group_by(PMRN, Last_Name, DOB, Date_RPLND) %>%
+    group_by(PMRN, Last_Name, DOB, Date_Surgery) %>%
     mutate(Readmit_Seq = row_number()) %>%
     ungroup() %>%
     mutate(Readmit_ID = paste0(PMRN, "_R", Readmit_Seq))
@@ -60,25 +60,25 @@ df.readmit_stays <- df.all_stays %>%
 # ICD-10-CM code on the admission date.
 
 df.readmit_dx_all <- df.readmit_stays %>%
-    select(PMRN, Last_Name, DOB, Date_RPLND,
+    select(PMRN, Last_Name, DOB, Date_Surgery,
            Readmit_ID, Readmit_Admit_Date, Readmit_Discharge_Date) %>%
     left_join(df.raw_codes %>%
-                  select(PMRN, Last_Name, DOB, Date_RPLND, Date_Code, ICD_CM_Code) %>%
+                  select(PMRN, Last_Name, DOB, Date_Surgery, Date_Code, ICD_CM_Code) %>%
                   distinct(),
-              by = c("PMRN", "Last_Name", "DOB", "Date_RPLND"),
+              by = c("PMRN", "Last_Name", "DOB", "Date_Surgery"),
               relationship = "many-to-many") %>%
     filter(!is.na(ICD_CM_Code),
            Date_Code >= Readmit_Admit_Date,
            Date_Code <= Readmit_Discharge_Date)
 
 df.readmit_pcs_all <- df.readmit_stays %>%
-    select(PMRN, Last_Name, DOB, Date_RPLND,
+    select(PMRN, Last_Name, DOB, Date_Surgery,
            Readmit_ID, Readmit_Admit_Date, Readmit_Discharge_Date) %>%
     left_join(df.ICD10PCS_codes %>%
-                  select(PMRN, Last_Name, DOB, Date_RPLND,
+                  select(PMRN, Last_Name, DOB, Date_Surgery,
                          Date_Code, original_ICD_10_PCS_rank, ICD_10_PCS) %>%
                   distinct(),
-              by = c("PMRN", "Last_Name", "DOB", "Date_RPLND"),
+              by = c("PMRN", "Last_Name", "DOB", "Date_Surgery"),
               relationship = "many-to-many") %>%
     filter(!is.na(ICD_10_PCS),
            Date_Code >= Readmit_Admit_Date,
@@ -86,25 +86,25 @@ df.readmit_pcs_all <- df.readmit_stays %>%
 
 pick_principal_dx <- function(dx_df, pcs_df, stays_df) {
     via_pcs <- pcs_df %>%
-        group_by(PMRN, Last_Name, DOB, Date_RPLND,
+        group_by(PMRN, Last_Name, DOB, Date_Surgery,
                  Readmit_ID, Readmit_Admit_Date, Readmit_Discharge_Date) %>%
         filter(original_ICD_10_PCS_rank == min(original_ICD_10_PCS_rank)) %>%
         slice(1) %>%
         ungroup() %>%
-        select(PMRN, Last_Name, DOB, Date_RPLND,
+        select(PMRN, Last_Name, DOB, Date_Surgery,
                Readmit_ID, Readmit_Admit_Date, Readmit_Discharge_Date, pcs_date = Date_Code) %>%
         left_join(dx_df %>%
                       select(Readmit_ID, Date_Code, ICD_CM_Code),
                   by = c("Readmit_ID", "pcs_date" = "Date_Code"),
                   relationship = "many-to-many") %>%
         filter(!is.na(ICD_CM_Code)) %>%
-        group_by(PMRN, Last_Name, DOB, Date_RPLND,
+        group_by(PMRN, Last_Name, DOB, Date_Surgery,
                  Readmit_ID, Readmit_Admit_Date, Readmit_Discharge_Date) %>%
         count(ICD_CM_Code) %>%
         arrange(desc(n), ICD_CM_Code) %>%
         slice(1) %>%
         ungroup() %>%
-        transmute(PMRN, Last_Name, DOB, Date_RPLND,
+        transmute(PMRN, Last_Name, DOB, Date_Surgery,
                   Readmit_ID, Readmit_Admit_Date, Readmit_Discharge_Date,
                   Principal_Dx = ICD_CM_Code)
 
@@ -114,13 +114,13 @@ pick_principal_dx <- function(dx_df, pcs_df, stays_df) {
                       select(Readmit_ID, Readmit_Admit_Date),
                   by = c("Readmit_ID", "Readmit_Admit_Date")) %>%
         filter(Date_Code == Readmit_Admit_Date) %>%
-        group_by(PMRN, Last_Name, DOB, Date_RPLND,
+        group_by(PMRN, Last_Name, DOB, Date_Surgery,
                  Readmit_ID, Readmit_Admit_Date, Readmit_Discharge_Date) %>%
         count(ICD_CM_Code) %>%
         arrange(desc(n), desc(ICD_CM_Code)) %>%
         slice(1) %>%
         ungroup() %>%
-        transmute(PMRN, Last_Name, DOB, Date_RPLND,
+        transmute(PMRN, Last_Name, DOB, Date_Surgery,
                   Readmit_ID, Readmit_Admit_Date, Readmit_Discharge_Date,
                   Principal_Dx = ICD_CM_Code)
 
@@ -140,9 +140,9 @@ df.readmit_pproc <- df.readmit_pcs_all %>%
     select(Readmit_ID, Principal_Proc = ICD_10_PCS)
 
 df.readmit_sdx <- df.readmit_dx_all %>%
-    right_join(df.readmit_pdx %>% select(PMRN, Last_Name, DOB, Date_RPLND, Readmit_ID,
+    right_join(df.readmit_pdx %>% select(PMRN, Last_Name, DOB, Date_Surgery, Readmit_ID,
                                           Readmit_Admit_Date, Readmit_Discharge_Date, Principal_Dx),
-               by = c("PMRN", "Last_Name", "DOB", "Date_RPLND",
+               by = c("PMRN", "Last_Name", "DOB", "Date_Surgery",
                       "Readmit_ID", "Readmit_Admit_Date", "Readmit_Discharge_Date")) %>%
     filter(is.na(Principal_Dx) | ICD_CM_Code != Principal_Dx) %>%
     distinct(Readmit_ID, ICD_CM_Code) %>%
@@ -165,10 +165,10 @@ df.readmit_sproc <- df.readmit_pcs_all %>%
 # ------------------------------------------------------------------------------------------------ #
 
 df.readmit_grouper_input <- df.readmit_stays %>%
-    rename(Index_Date_RPLND = Date_RPLND) %>%
+    rename(Index_Date_Surgery = Date_Surgery) %>%
     left_join(df.clinical %>%
-                  select(Last_Name, DOB, Date_RPLND, Age),
-              by = c("Last_Name", "DOB", "Index_Date_RPLND" = "Date_RPLND")) %>%
+                  select(Last_Name, DOB, Date_Surgery, Age),
+              by = c("Last_Name", "DOB", "Index_Date_Surgery" = "Date_Surgery")) %>%
     left_join(df.readmit_pdx %>%
                   select(Readmit_ID, Principal_Dx),
               by = "Readmit_ID") %>%
@@ -176,7 +176,7 @@ df.readmit_grouper_input <- df.readmit_stays %>%
     left_join(df.readmit_sdx,   by = "Readmit_ID") %>%
     left_join(df.readmit_sproc, by = "Readmit_ID") %>%
     filter(!is.na(Principal_Dx)) %>%  # ungroupable without a diagnosis
-    mutate(Date_RPLND     = as.Date(Readmit_Admit_Date),   # grouper functions read this field name
+    mutate(Date_Surgery     = as.Date(Readmit_Admit_Date),   # grouper functions read this field name
            Discharge_Date = as.Date(Readmit_Discharge_Date),
            LOS            = Readmit_LOS,
            # EDIT per your cohort if these assumptions don't apply

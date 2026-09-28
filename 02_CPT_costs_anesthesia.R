@@ -88,14 +88,14 @@ df.anes_rows <- df.raw_codes %>%
         CPT_Code %in% time_based_exceptions ~ "flat_daily",
         CPT_Code == "01999"                 ~ "unlisted",
         TRUE                                ~ "time_based"),
-        days_from_surgery = as.numeric(difftime(Date_Code, Date_RPLND, units = "days"))) %>%
-    left_join(df.clinical %>% select(Last_Name, DOB, Date_RPLND, OR_time_min),
-              by = c("Last_Name", "DOB", "Date_RPLND"))
+        days_from_surgery = as.numeric(difftime(Date_Code, Date_Surgery, units = "days"))) %>%
+    left_join(df.clinical %>% select(Last_Name, DOB, Date_Surgery, OR_time_min),
+              by = c("Last_Name", "DOB", "Date_Surgery"))
 
 # within each patient, the time-based anesthesia row closest to the surgery date (within +/-3 days)
 # is treated as the index-procedure anesthesia and assigned the recorded OR time
 df.anes_rows <- df.anes_rows %>%
-    group_by(PMRN, Date_RPLND) %>%
+    group_by(PMRN, Date_Surgery) %>%
     mutate(is_index_anesthesia = anes_pricing_type == "time_based" &
                abs(days_from_surgery) <= 3 &
                abs(days_from_surgery) == min(abs(days_from_surgery)[anes_pricing_type == "time_based"],
@@ -122,7 +122,7 @@ df.anes_costs <- df.anes_rows %>%
 
 df.PFS_costs_anes <- df.anes_costs %>%
     mutate(cost_component = "Anesthesia") %>%
-    select(PMRN, Last_Name, DOB, Date_RPLND, Year_Code, Date_Code, days_from_surgery,
+    select(PMRN, Last_Name, DOB, Date_Surgery, Year_Code, Date_Code, days_from_surgery,
            CPT_Code, cost_component, payment_2025usd) %>%
     distinct()
 

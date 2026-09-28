@@ -4,7 +4,8 @@
 # ## Main Script ## ------------------------------------------------------------------------------ #
 # ################################################################################################ #
 
-# If you use or adapt this code, please cite our paper:
+# We encourage you to adapt this code for your own project; however, please cite our paper:
+
 #   Magnani CJ, Ramos F, Qian Z, et al. Robotic-Assisted vs. Open Retroperitoneal Lymph Node
 #     Dissection for Testicular Cancer: Real-World Evidence of Lower Costs and Health System
 #     Utilization. [Journal]. [Year];[Vol(Issue)]:[Pages]. doi:[DOI] PMID: .
@@ -35,12 +36,12 @@
 # protected health information, in brief study cohort data should be formatted as follows:
 
 # df.clinical  - one row per patient
-#   Required: PMRN, Last_Name, DOB, Date_RPLND (this can be substituted with index surgery date),
+#   Required: PMRN, Last_Name, DOB, Date_Surgery (this corresponds to index surgery or date),
 #             Robotic (0/1 - can be substituted with comparison variable), Age, LOS
 #   (plus any additional covariates used by downstream analysis scripts)
 
 # df.raw_codes - one row per billed code per patient (long format)
-#   Required: PMRN, Last_Name, DOB, Date_RPLND, Date_Code, CPT_Code, CPT_Code_original,
+#   Required: PMRN, Last_Name, DOB, Date_Surgery, Date_Code, CPT_Code, CPT_Code_original,
 #             ICD_CM_Code, Department (optional; used to flag ER/IR encounters)
 #   Plus one or more ICD_10_PCS_<n> columns (inpatient procedure codes, ranked by billing priority)
 #   ICD_10_PCS could be given their own rows in long format with skips a step, in which case a

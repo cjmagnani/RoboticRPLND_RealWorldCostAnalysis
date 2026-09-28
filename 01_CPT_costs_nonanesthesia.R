@@ -117,9 +117,9 @@ df.CPT_costs <- df.raw_codes %>%
 # exclude anesthesia codes (priced separately in 02_CPT_costs_anesthesia.R)
 df.PFS_costs_nonanes <- df.CPT_costs %>%
     filter(payable, !(CPT_Code >= "00100" & CPT_Code <= "01999")) %>%
-    mutate(days_from_surgery = as.numeric(difftime(Date_Code, Date_RPLND, units = "days")),
+    mutate(days_from_surgery = as.numeric(difftime(Date_Code, Date_Surgery, units = "days")),
            cost_component    = "Other CPT") %>%
-    select(PMRN, Last_Name, DOB, Date_RPLND, Year_Code, Date_Code, days_from_surgery,
+    select(PMRN, Last_Name, DOB, Date_Surgery, Year_Code, Date_Code, days_from_surgery,
            CPT_Code, cost_component, payment_2025usd) %>%
     distinct()
 
